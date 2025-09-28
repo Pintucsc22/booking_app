@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'customer_home.dart'; // We'll create this later
+import 'admin_dashboard.dart'; // We'll create this later
 
-class CustomerLogin extends StatefulWidget {
-  const CustomerLogin({super.key});
+class AdminLogin extends StatefulWidget {
+  const AdminLogin({super.key});
 
   @override
-  State<CustomerLogin> createState() => _CustomerLoginState();
+  State<AdminLogin> createState() => _AdminLoginState();
 }
 
-class _CustomerLoginState extends State<CustomerLogin> {
+class _AdminLoginState extends State<AdminLogin> {
   final _auth = FirebaseAuth.instance;
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
@@ -22,9 +22,12 @@ class _CustomerLoginState extends State<CustomerLogin> {
       UserCredential user = await _auth.signInWithEmailAndPassword(
           email: _emailController.text.trim(),
           password: _passwordController.text.trim());
+
+      // TODO: check if user is admin in Firestore
+
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (_) => const CustomerHome()),
+        MaterialPageRoute(builder: (_) => const AdminDashboard()),
       );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -41,9 +44,12 @@ class _CustomerLoginState extends State<CustomerLogin> {
       UserCredential user = await _auth.createUserWithEmailAndPassword(
           email: _emailController.text.trim(),
           password: _passwordController.text.trim());
+
+      // TODO: mark user as admin in Firestore
+
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (_) => const CustomerHome()),
+        MaterialPageRoute(builder: (_) => const AdminDashboard()),
       );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -57,7 +63,7 @@ class _CustomerLoginState extends State<CustomerLogin> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Customer Login")),
+      appBar: AppBar(title: const Text("Admin Login")),
       body: Center(
         child: Padding(
           padding: const EdgeInsets.all(16.0),
