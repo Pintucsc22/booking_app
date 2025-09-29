@@ -41,7 +41,7 @@ dependencies:
   intl: ^0.20.2
   flutter_local_notifications: ^19.4.2
   url_launcher: ^6.3.2
-
+  flutter_dotenv: ^5.0.2
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -58,6 +58,8 @@ dev_dependencies:
 
 # The following section is specific to Flutter packages.
 flutter:
+  assets:
+    - assets/.env
 
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in
