@@ -27,21 +27,32 @@ class _CustomerBookingState extends State<CustomerBooking> {
   final user = FirebaseAuth.instance.currentUser;
 
   List<String> generateTimeSlots(int duration) {
-    // salon working hours: 10:00 to 20:00
     List<String> slots = [];
     TimeOfDay start = const TimeOfDay(hour: 10, minute: 0);
     TimeOfDay end = const TimeOfDay(hour: 20, minute: 0);
 
-    int totalMinutes = (end.hour - start.hour) * 60 + (end.minute - start.minute);
+    int totalMinutes =
+        (end.hour - start.hour) * 60 + (end.minute - start.minute);
     int slotCount = totalMinutes ~/ duration;
 
     for (int i = 0; i < slotCount; i++) {
       int hour = start.hour + ((start.minute + i * duration) ~/ 60);
       int minute = (start.minute + i * duration) % 60;
-      String time = "${hour.toString().padLeft(2,'0')}:${minute.toString().padLeft(2,'0')}";
+      String time =
+          "${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}";
       slots.add(time);
     }
     return slots;
+  }
+
+  Future<List<String>> fetchBookedSlots(DateTime date) async {
+    final snapshot = await _firestore
+        .collection("bookings")
+        .where("date",
+            isEqualTo: DateTime(date.year, date.month, date.day)) // normalize
+        .get();
+
+    return snapshot.docs.map((doc) => doc["time"] as String).toList();
   }
 
   @override
@@ -66,6 +77,7 @@ class _CustomerBookingState extends State<CustomerBooking> {
                 if (picked != null) {
                   setState(() {
                     selectedDate = picked;
+                    selectedTime = null; // reset time when date changes
                   });
                 }
               },
@@ -73,38 +85,81 @@ class _CustomerBookingState extends State<CustomerBooking> {
             if (selectedDate != null)
               Text("Selected Date: ${selectedDate!.toLocal().toString().split(' ')[0]}"),
             const SizedBox(height: 20),
-            Wrap(
-              spacing: 8,
-              children: slots.map((time) {
-                return ChoiceChip(
-                  label: Text(time),
-                  selected: selectedTime == time,
-                  onSelected: (_) {
-                    setState(() {
-                      selectedTime = time;
-                    });
-                  },
-                );
-              }).toList(),
-            ),
+
+            // --- Show slots with Firestore check ---
+            if (selectedDate != null)
+              FutureBuilder<List<String>>(
+                future: fetchBookedSlots(selectedDate!),
+                builder: (context, snapshot) {
+                  if (!snapshot.hasData) {
+                    return const CircularProgressIndicator();
+                  }
+                  final bookedSlots = snapshot.data!;
+                  return Wrap(
+                    spacing: 8,
+                    children: slots.map((time) {
+                      final isBooked = bookedSlots.contains(time);
+                      return ChoiceChip(
+                        label: Text(
+                          time,
+                          style: TextStyle(
+                            color: isBooked ? Colors.grey : null,
+                          ),
+                        ),
+                        selected: selectedTime == time,
+                        onSelected: isBooked
+                            ? null
+                            : (_) {
+                                setState(() {
+                                  selectedTime = time;
+                                });
+                              },
+                      );
+                    }).toList(),
+                  );
+                },
+              ),
+
             const SizedBox(height: 20),
+
             ElevatedButton(
               child: const Text("Confirm Booking (Cash Only)"),
               onPressed: selectedDate != null && selectedTime != null
                   ? () async {
+                      // Check if slot already booked
+                      final existing = await _firestore
+                          .collection("bookings")
+                          .where("date",
+                              isEqualTo: DateTime(selectedDate!.year,
+                                  selectedDate!.month, selectedDate!.day))
+                          .where("time", isEqualTo: selectedTime)
+                          .get();
+
+                      if (existing.docs.isNotEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                              content: Text("This slot is already booked.")),
+                        );
+                        return;
+                      }
+
+                      // Save booking
                       await _firestore.collection("bookings").add({
                         'serviceId': widget.serviceId,
                         'serviceName': widget.serviceName,
                         'price': widget.price,
                         'userId': user!.uid,
                         'userName': user!.email,
-                        'userPhone': "", // optional, extend later
-                        'date': selectedDate,
+                        'userPhone': "",
+                        'date': DateTime(selectedDate!.year,
+                            selectedDate!.month, selectedDate!.day),
                         'time': selectedTime,
                         'status': "Pending",
                       });
+
                       ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text("Booking confirmed!")));
+                        const SnackBar(content: Text("Booking confirmed!")),
+                      );
                       Navigator.pop(context);
                     }
                   : null,
